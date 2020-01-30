@@ -15,6 +15,7 @@ use rendy::{
     graph::{render::*, Graph, GraphBuilder, GraphContext, NodeBuffer, NodeImage},
     hal::{self, Backend},
     init::winit::{
+        dpi::PhysicalSize,
         event::{Event, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
         window::WindowBuilder,
@@ -23,18 +24,15 @@ use rendy::{
     memory::Dynamic,
     mesh::PosColor,
     resource::{Buffer, BufferInfo, DescriptorSetLayout, Escape, Handle},
-    shader::{ShaderKind, SourceLanguage, SourceShaderInfo, SpirvShader},
+    shader::{SpirvShader},
+
 };
 
-#[cfg(feature = "spirv-reflection")]
-use rendy::shader::SpirvReflection;
-
-#[cfg(not(feature = "spirv-reflection"))]
 use rendy::mesh::AsVertex;
 
 lazy_static::lazy_static! {
     static ref VERTEX: SpirvShader = SourceShaderInfo::new(
-        include_str!("shader.vert"),
+        include_str!("shaders/shader.vert"),
         concat!(env!("CARGO_MANIFEST_DIR"), "shaders/shader.vert").into(),
         ShaderKind::Vertex,
         SourceLanguage::GLSL,
@@ -42,7 +40,7 @@ lazy_static::lazy_static! {
     ).precompile().unwrap();
 
     static ref FRAGMENT: SpirvShader = SourceShaderInfo::new(
-        include_str!("shader.frag"),
+        include_str!("shaders/shader.frag"),
         concat!(env!("CARGO_MANIFEST_DIR"), "shaders/shader.frag").into(),
         ShaderKind::Fragment,
         SourceLanguage::GLSL,
@@ -52,11 +50,6 @@ lazy_static::lazy_static! {
     static ref SHADERS: rendy::shader::ShaderSetBuilder = rendy::shader::ShaderSetBuilder::default()
         .with_vertex(&*VERTEX).unwrap()
         .with_fragment(&*FRAGMENT).unwrap();
-}
-
-#[cfg(feature = "spirv-reflection")]
-lazy_static::lazy_static! {
-    static ref SHADER_REFLECTION: SpirvReflection = SHADERS.reflect().unwrap();
 }
 
 #[derive(Debug, Default)]
@@ -78,7 +71,7 @@ where
         None
     }
 
-    fn load_shader_set(&self, factory: &mut Factory<B>, _aux: &T) -> rendy_shader::ShaderSet<B> {
+    fn load_shader_set(&self, factory: &mut Factory<B>, _aux: &T) -> rendy::shader::ShaderSet<B> {
         SHADERS.build(factory, Default::default()).unwrap()
     }
 
@@ -89,13 +82,6 @@ where
         hal::pso::ElemStride,
         hal::pso::VertexInputRate,
     )> {
-        #[cfg(feature = "spirv-reflection")]
-        return vec![SHADER_REFLECTION
-            .attributes_range(..)
-            .unwrap()
-            .gfx_vertex_input_desc(hal::pso::VertexInputRate::Vertex)];
-
-        #[cfg(not(feature = "spirv-reflection"))]
         return vec![PosColor::vertex().gfx_vertex_input_desc(hal::pso::VertexInputRate::Vertex)];
     }
 
@@ -108,7 +94,7 @@ where
         buffers: Vec<NodeBuffer>,
         images: Vec<NodeImage>,
         set_layouts: &[Handle<DescriptorSetLayout<B>>],
-    ) -> Result<TriangleRenderPipeline<B>, rendy_core::hal::pso::CreationError> {
+    ) -> Result<TriangleRenderPipeline<B>, hal::pso::CreationError> {
         assert!(buffers.is_empty());
         assert!(images.is_empty());
         assert!(set_layouts.is_empty());
@@ -133,10 +119,6 @@ where
         _aux: &T,
     ) -> PrepareResult {
         if self.vertex.is_none() {
-            #[cfg(feature = "spirv-reflection")]
-            let vbuf_size = SHADER_REFLECTION.attributes_range(..).unwrap().stride as u64 * 3;
-
-            #[cfg(not(feature = "spirv-reflection"))]
             let vbuf_size = PosColor::vertex().stride as u64 * 3;
 
             let mut vbuf = factory
@@ -215,7 +197,7 @@ fn run<B: Backend>(
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 _ => {}
             },
-            Event::EventsCleared => {
+            Event::MainEventsCleared => {
                 factory.maintain(&mut families);
                 if let Some(ref mut graph) = graph {
                     graph.run(&mut factory, &mut families, &());
@@ -257,14 +239,14 @@ pub fn main_js() -> Result<(), JsValue> {
     let config: Config = Default::default();
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
-        .with_inner_size((960, 640).into())
+        .with_inner_size(PhysicalSize::new(960, 640))
         .with_title("Rendy example");
 
     let rendy = AnyWindowedRendy::init_auto(&config, window, &event_loop).unwrap();
     rendy::with_any_windowed_rendy!((rendy)
         (mut factory, mut families, surface, window) => {
             let mut graph_builder = GraphBuilder::<_, ()>::new();
-            let (width, height) = window.inner_size().to_physical(window.hidpi_factor()).into();
+            let (width, height) = window.inner_size().into();
 
             graph_builder.add_node(
                 TriangleRenderPipeline::builder()

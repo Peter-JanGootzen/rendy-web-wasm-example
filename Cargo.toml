@@ -30,9 +30,13 @@ wasm-bindgen = "0.2.45"
 # allocator, so it's not enabled by default.
 wee_alloc = { version = "0.4.2", optional = true }
 
+log = "0.4.8"
+lazy_static = "1.4.0"
+
 [dependencies.rendy]
 version = "0.5.1"
-features = ["base", "init-winit", "shader-compiler", "gl"]
+features = ["base", "init-winit", "gl"]
+default-features = false
 
 # The `web-sys` crate allows you to interact with the various browser APIs,
 # like the DOM.
