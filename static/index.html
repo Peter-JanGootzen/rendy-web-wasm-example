@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>My Rust + Webpack project!</title>
+  </head>
+  <body>
+    <script src="./spirv_cross_wrapper_glsl.js"></script>
+    <script type="module">
+      window.addEventListener("load", () => {
+        const module = window.sc_internal_wrapper().then(module => {
+          window.sc_internal = module;
+          import("../pkg/index.js").catch(console.error);
+        });
+      });
+    </script>
+  </body>
+</html>
