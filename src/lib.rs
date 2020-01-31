@@ -13,8 +13,9 @@ use rendy::{
     command::{Families, QueueId, RenderPassEncoder},
     factory::{Config, Factory},
     graph::{render::*, Graph, GraphBuilder, GraphContext, NodeBuffer, NodeImage},
-    hal::{self, Backend},
+    hal::{self, Backend, pso::ShaderStageFlags},
     init::winit::{
+        self,
         dpi::PhysicalSize,
         event::{Event, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
@@ -31,21 +32,17 @@ use rendy::{
 use rendy::mesh::AsVertex;
 
 lazy_static::lazy_static! {
-    static ref VERTEX: SpirvShader = SourceShaderInfo::new(
-        include_str!("shaders/shader.vert"),
-        concat!(env!("CARGO_MANIFEST_DIR"), "shaders/shader.vert").into(),
-        ShaderKind::Vertex,
-        SourceLanguage::GLSL,
+    static ref VERTEX: SpirvShader = SpirvShader::from_bytes(
+        &include_bytes!("shaders/shader.vert.spv")[..],
+        ShaderStageFlags::VERTEX,
         "main",
-    ).precompile().unwrap();
+    ).unwrap();
 
-    static ref FRAGMENT: SpirvShader = SourceShaderInfo::new(
-        include_str!("shaders/shader.frag"),
-        concat!(env!("CARGO_MANIFEST_DIR"), "shaders/shader.frag").into(),
-        ShaderKind::Fragment,
-        SourceLanguage::GLSL,
+    static ref FRAGMENT: SpirvShader = SpirvShader::from_bytes(
+        &include_bytes!("shaders/shader.frag.spv")[..],
+        ShaderStageFlags::FRAGMENT,
         "main",
-    ).precompile().unwrap();
+    ).unwrap();
 
     static ref SHADERS: rendy::shader::ShaderSetBuilder = rendy::shader::ShaderSetBuilder::default()
         .with_vertex(&*VERTEX).unwrap()
@@ -184,10 +181,7 @@ fn run<B: Backend>(
     mut families: Families<B>,
     graph: Graph<B, ()>,
 ) {
-    let started = std::time::Instant::now();
-
     let mut frame = 0u64;
-    let mut elapsed = started.elapsed();
     let mut graph = Some(graph);
 
     event_loop.run(move |event, _, control_flow| {
@@ -204,24 +198,11 @@ fn run<B: Backend>(
                     frame += 1;
                 }
 
-                elapsed = started.elapsed();
-                if elapsed >= std::time::Duration::new(5, 0) {
-                    *control_flow = ControlFlow::Exit
-                }
             }
             _ => {}
         }
 
         if *control_flow == ControlFlow::Exit && graph.is_some() {
-            let elapsed_ns = elapsed.as_secs() * 1_000_000_000 + elapsed.subsec_nanos() as u64;
-
-            log::info!(
-                "Elapsed: {:?}. Frames: {}. FPS: {}",
-                elapsed,
-                frame,
-                frame * 1_000_000_000 / elapsed_ns
-            );
-
             graph.take().unwrap().dispose(&mut factory, &());
         }
     });

@@ -10,9 +10,10 @@
       window.addEventListener("load", () => {
         const module = window.sc_internal_wrapper().then(module => {
           window.sc_internal = module;
-          import("../pkg/index.js").catch(console.error);
+          import("./index.js");
         });
       });
     </script>
+    <canvas tabindex="0" data-raw-handle="1" width="640" height="480" style="width: 1024px; height: 768px;" alt="quad"></canvas>
   </body>
 </html>
